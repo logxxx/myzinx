@@ -4,22 +4,23 @@ import (
 	"000web/009zinx/ziface"
 	"fmt"
 	"net"
-	"time"
 )
 
 type Server struct {
-	Name string
+	Name      string
 	IPVersion string
-	IP string
-	Port int
+	IP        string
+	Port      int
+	Router    ziface.IRouter
 }
 
 func NewServer(name string) ziface.IServer {
-	s := &Server {
-		Name: name,
+	s := &Server{
+		Name:      name,
 		IPVersion: "tcp4",
-		IP: "0.0.0.0",
-		Port: 8999,
+		IP:        "0.0.0.0",
+		Port:      8999,
+		Router:    nil,
 	}
 	return s
 }
@@ -42,29 +43,18 @@ func (s *Server) Start() {
 		fmt.Println("Start() ListenTCP() succ: ",
 			"name=", s.Name)
 
+		var cid uint32
+		cid = 0
+
 		for {
 			conn, err := listener.AcceptTCP()
 			if err != nil {
 				fmt.Println("Start AcceptTCP err:", err)
 				continue
 			}
-			go func() {
-				for {
-					buf := make([]byte, 512)
-					cnt, err := conn.Read(buf)
-					if err != nil {
-						fmt.Println("start Read err:", err)
-						continue
-					}
-					if _, err := conn.Write(buf[:cnt]); err != nil {
-						fmt.Println("start Write err:", err)
-						continue
-					}
-					fmt.Println("[", time.Now().Format("2006/01/02 15:04:05"), "]",
-						"Receive from client:", conn.LocalAddr(),
-						" content:", string(buf))
-				}
-			}()
+			dealConn := NewConnection(conn, cid, s.Router)
+			cid++
+			dealConn.Start()
 		}
 	}()
 
@@ -77,5 +67,10 @@ func (s *Server) Stop() {
 func (s *Server) Serve() {
 	s.Start()
 
-	select{}
+	select {}
+}
+
+func (s *Server) AddRouter(router ziface.IRouter) {
+	s.Router = router
+	fmt.Println("Server AddRouter Succ")
 }

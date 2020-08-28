@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"000web/009zinx/utils"
 	"000web/009zinx/ziface"
 	"fmt"
 	"net"
@@ -16,17 +17,19 @@ type Server struct {
 
 func NewServer(name string) ziface.IServer {
 	s := &Server{
-		Name:      name,
+		Name:      utils.GlobalObject.Name,
 		IPVersion: "tcp4",
-		IP:        "0.0.0.0",
-		Port:      8999,
+		IP:        utils.GlobalObject.Host,
+		Port:      utils.GlobalObject.TcpPort,
 		Router:    nil,
 	}
 	return s
 }
 
 func (s *Server) Start() {
-	fmt.Printf("[Server]Start.ip=%v port=%v", s.IP, s.Port)
+	fmt.Printf("[Zinx] Server Name:%v, listener HOST:%v PORT:%v",
+		s.Name, s.IP, s.Port,
+	)
 	go func() {
 		addr, err := net.ResolveTCPAddr(s.IPVersion,
 			fmt.Sprintf("%v:%v", s.IP, s.Port))

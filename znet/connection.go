@@ -1,9 +1,10 @@
 package znet
 
 import (
-	"000web/009zinx/utils"
 	"000web/009zinx/ziface"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 )
 
@@ -38,17 +39,33 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 
 	for {
-		buf := make([]byte, utils.GlobalObject.MaxPackageSize)
-		cnt, err := c.Conn.Read(buf)
+		dp := NewDataPack()
+		headData := make([]byte, dp.GetHeadLen())
+		_, err := io.ReadFull(c.GetTCPConnection(), headData)
 		if err != nil {
-			fmt.Println("recv buf err:", err)
-			continue
+			fmt.Printf("StartReader ReadFull err:%v\n", err)
+			return
 		}
-		fmt.Println("recv buf succ:cnt=", cnt)
+		msg, err := dp.Unpack(headData)
+		if err != nil {
+			fmt.Printf("StartReader Unpack err:%v\n", err)
+			return
+		}
+
+		var data []byte
+		if msg.GetMsgLen() > 0 {
+			data = make([]byte, msg.GetMsgLen())
+			_, err := io.ReadFull(c.GetTCPConnection(), data)
+			if err != nil {
+				fmt.Printf("StartReader ReadFull err:%v\n", err)
+				return
+			}
+		}
+		msg.SetData(data)
 
 		req := &Request{
 			conn: c,
-			data: buf,
+			msg:  msg,
 		}
 
 		go func(req ziface.IRequest) {
@@ -57,6 +74,25 @@ func (c *Connection) StartReader() {
 			c.Router.PostHandle(req)
 		}(req)
 	}
+}
+
+func (c *Connection) SendMsg(msgId uint32, data []byte) error {
+	if c.isClosed {
+		return errors.New("conn closed, cannot send msg.")
+	}
+	dp := NewDataPack()
+	msg := NewMessage(msgId, data)
+	binaryMsg, err := dp.Pack(msg)
+	if err != nil {
+		fmt.Printf("SendMsg Pack err:%v\n", err)
+		return err
+	}
+	_, err = c.Conn.Write(binaryMsg)
+	if err != nil {
+		fmt.Printf("SendMsg Write err:%v\n", err)
+		return err
+	}
+	return nil
 }
 
 func (c *Connection) Start() {
@@ -91,8 +127,4 @@ func (c *Connection) GetConnID() uint32 {
 
 func (c *Connection) RemoteAddr() net.Addr {
 	return c.Conn.RemoteAddr()
-}
-
-func (c *Connection) Send(data []byte) error {
-	return nil
 }

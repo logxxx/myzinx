@@ -28,7 +28,7 @@ func init() {
 		TcpPort:        8999,
 		Host:           "0.0.0.0",
 		MaxConn:        1000,
-		MaxPackageSize: 4096,
+		MaxPackageSize: 409600,
 	}
 
 	GlobalObject.Reload()
